@@ -18,6 +18,7 @@ class Encoder {
 private:
 	int* key;
 	int size_key;
+	int* reverse_key;
 public:
 	Encoder()
 	{
@@ -31,29 +32,46 @@ public:
 		copy_array(key, this->key, size_key);
 	}
 	
-	bool Encode(string text)
+	string Encode(string text)
+	{
+		string encode_text;
+		size_t size_text = text.size();
+		int shift = 0;
+		for (size_t i = 0; i < size_text; i++)
+		{
+			if (i % size_key == 0 && i != 0)
+			{
+				shift++;
+			}
+			encode_text += text[this->key[i % size_key] + (size_key * shift) - 1];
+		}
+		cout << encode_text;
+		return encode_text;
+	}
+
+	string Decode(string text)
 	{
 		char* symbols = new char[size_key];
-		int pos = 0;
-		while (pos < text.size())
+		string decode_text;
+		size_t size_text = text.size();
+		int shift = 0;
+		for (size_t i = 0; i < size_text; i++)
 		{
-			pos += text.copy(symbols, size_key, pos);
-			if (pos % size_key != 0)
+			if (i % size_key == 0 && i != 0)
 			{
-				for (size_t i = pos % size_key; i < size_key; i++)
-				{
-					symbols[i] = ' ';
-				}
-				cout << symbols;
+				symbols[size_key] = '\0';
+				decode_text += symbols;
+				shift++;
 			}
-			symbols[size_key] = '\0';
-
-			string result;
-
-
+			symbols[this->key[i % size_key] - 1] = text[i];
 		}
-		return 0;
+		symbols[size_key] = '\0';
+		decode_text += symbols;
+		cout << decode_text;
+		return decode_text;
 	}
+	
+
 
 
 };
@@ -62,12 +80,8 @@ public:
 
 int main()
 {
-	string text = "Hello, my name is Alex";
-
+	string text = "Hola, my name is Alp";
 	Encoder enc = Encoder();
-	enc.Encode(text);
-	// enc.Decode(text);
-
-
-
+	string enc_text = enc.Encode(text);
+	string dec_text = enc.Decode(enc_text);
 }
