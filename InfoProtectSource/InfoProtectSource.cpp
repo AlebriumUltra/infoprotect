@@ -11,16 +11,52 @@ void CopyArray(int* source, int* dest, int size)
 	}
 }
 
-void RemoveSpaces(string& str)
+void FilesCompare(string text_filename, string decode_filename)
 {
-	for (string::iterator it = str.begin(); it != str.end(); it++)
+	ifstream text_file(text_filename, ios::binary);
+	ifstream decode_file(decode_filename, ios::binary);
+
+	if (text_file.is_open() && decode_file.is_open())
 	{
-		string::iterator begin = it;
-		while (it != str.end() && isspace((unsigned char)*it))
-			it++;
-		if (it - begin > 1)
-			it = str.erase(begin + 1, it) - 1;
+		int size_text;
+		int size_decode;
+
+		text_file.seekg(0, text_file.end);
+		decode_file.seekg(0, decode_file.end);
+
+		size_text = text_file.tellg();
+		size_decode = decode_file.tellg();
+
+		text_file.seekg(0, text_file.beg);
+		decode_file.seekg(0, decode_file.beg);
+
+		bool result = true;
+		if (size_text != size_decode)
+		{
+			result = false;
+		}
+		else
+		{
+			char ch1, ch2;
+			do
+			{
+				decode_file.get(ch2);
+				text_file.get(ch1);
+				if (ch1 != ch2)
+				{
+					result = false;
+					break;
+				}
+			} while (!text_file.eof() && !decode_file.eof());
+		}
+		if (result)
+			cout << "Equal" << endl;
+		else
+			cout << "Unequal" << endl;
 	}
+	else
+		cout << "Error opening file!" << endl;
+
 }
 
 class Encoder {
@@ -81,21 +117,36 @@ public:
 	
 	bool FileEncode(string text_filename, string encode_filename)
 	{
-		ifstream text_file(text_filename);
+		fstream text_file(text_filename);
 		ofstream encode_file(encode_filename);
-		string text;
+		char* text = new char[size_key];
+		text[size_key] = '\0';
 		string encode_text;
+		int count_ch;
 		if (text_file.is_open() && encode_file.is_open())
 		{
-			cout << "Files is open. Start Encoding\n";
-			while (getline(text_file, text))
+			text_file.seekg(0, text_file.end);
+			count_ch = text_file.tellg();
+			if (count_ch % size_key != 0)
 			{
+				for (int i = 0; i < size_key - (count_ch % size_key); i++)
+				{
+					text_file << ' ';
+				}
+			}
+			text_file.seekg(0, text_file.beg);
+
+			cout << "Files is open. Start Encoding\n";
+			while (!text_file.eof())
+			{
+				text_file.read(text, this->size_key);
+				if (text_file.eof())
+					break;
 				encode_text = Encode(text);
 				encode_file << encode_text;
 			}
 			text_file.close();
 			encode_file.close();
-
 		}
 		else
 		{
@@ -108,20 +159,22 @@ public:
 	{
 		ifstream text_file(text_filename);
 		ofstream decode_file(decode_filename);
-		string text;
+		char* text = new char[size_key];
+		text[size_key] = '\0';
 		string decode_text;
 		if (text_file.is_open() && decode_file.is_open())
 		{
 			cout << "Files is open. Start Decoding\n";
-			while (getline(text_file, text))
+			while (!text_file.eof())
 			{
+				text_file.read(text, this->size_key);
+				if (text_file.eof())
+					break;
 				decode_text = Decode(text);
-				RemoveSpaces(decode_text);
 				decode_file << decode_text;
 			} 
 			text_file.close();
 			decode_file.close();
-
 		}
 		else
 		{
@@ -143,4 +196,5 @@ int main()
 
 	enc.FileEncode("text.txt", "encode_text.txt");
 	enc.FileDecode("encode_text.txt", "decode_text.txt");
+	FilesCompare("text.txt", "decode_text.txt");
 }
