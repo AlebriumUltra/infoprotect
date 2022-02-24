@@ -63,90 +63,70 @@ class Encoder {
 private:
 	int* key;
 	int size_key;
+	int count_file;
+
+	
 public:
 	Encoder()
 	{
 		this->size_key = 10;
 		this->key = new int[this->size_key] {3, 6, 5, 2, 4, 1, 7, 9, 8, 10};
+		this->count_file = 0;
 	}
 	Encoder(int* key, int size_key)
 	{
 		this->size_key = size_key;
 		this->key = new int[this->size_key];
+		this->count_file = 0;
 		CopyArray(key, this->key, size_key);
 	}
 	
-	string Encode(string text)
+	void Encode(char* source_text, char* encode_text, int size_source)
 	{
-		string encode_text;
-		while (text.size() % 10 != 0)
-			text += ' ';
-		size_t size_text = text.size();
-		int shift = 0;
-		for (size_t i = 0; i < size_text; i++)
+		if (size_source % this->size_key != 0)
 		{
-			if (i % size_key == 0 && i != 0)
-			{
-				shift++;
-			}
-			encode_text += text[this->key[i % size_key] + (size_key * shift) - 1];
+			memset(&source_text[size_source], ' ', this->size_key - size_source);
+			source_text[this->size_key] = '\0';
 		}
-		return encode_text;
+
+		for (size_t i = 0; i < this->size_key; i++)
+		{
+			encode_text[i] = source_text[this->key[i] - 1];
+		}
 	}
 
-	string Decode(string text)
+	void Decode(char* source_text, char* decode_text)
 	{
-		char* symbols = new char[size_key];
-		string decode_text;
-		size_t size_text = text.size();
-		int shift = 0;
-		for (size_t i = 0; i < size_text; i++)
+		for (size_t i = 0; i < this->size_key; i++)
 		{
-			if (i % size_key == 0 && i != 0)
-			{
-				symbols[size_key] = '\0';
-				decode_text += symbols;
-				shift++;
-			}
-			symbols[this->key[i % size_key] - 1] = text[i];
+			decode_text[this->key[i] - 1] = source_text[i];
 		}
-		symbols[size_key] = '\0';
-		decode_text += symbols;
-		return decode_text;
 	}
+
 	
 	bool FileEncode(string text_filename, string encode_filename)
 	{
-		fstream text_file(text_filename);
-		ofstream encode_file(encode_filename);
+		ifstream text_file(text_filename, ios::binary);
+		ofstream encode_file(encode_filename, ios::binary);
 		char* text = new char[size_key];
+		char* encode_text = new char[size_key];
 		text[size_key] = '\0';
-		string encode_text;
+		encode_text[size_key] = '\0';
 		int count_ch;
 		if (text_file.is_open() && encode_file.is_open())
 		{
-			text_file.seekg(0, text_file.end);
-			count_ch = text_file.tellg();
-			if (count_ch % size_key != 0)
-			{
-				for (int i = 0; i < size_key - (count_ch % size_key); i++)
-				{
-					text_file << ' ';
-				}
-			}
-			text_file.seekg(0, text_file.beg);
-
-			cout << "Files is open. Start Encoding\n";
+			cout << "Files is open. Start Encoding: " << text_filename << "\n";
 			while (!text_file.eof())
 			{
 				text_file.read(text, this->size_key);
-				if (text_file.eof())
+				if (text_file.eof() && text_file.gcount() == 0)
 					break;
-				encode_text = Encode(text);
-				encode_file << encode_text;
+				Encode(text, encode_text, text_file.gcount());
+				encode_file.write(encode_text, this->size_key);
 			}
 			text_file.close();
 			encode_file.close();
+			cout << "Success! Encode file: " << encode_filename << "\n";
 		}
 		else
 		{
@@ -155,26 +135,45 @@ public:
 		}
 	}
 
-	bool FileDecode(string text_filename, string decode_filename)
+	bool FileDecode(string text_filename, string encode_filename, string decode_filename)
 	{
-		ifstream text_file(text_filename);
-		ofstream decode_file(decode_filename);
-		char* text = new char[size_key];
-		text[size_key] = '\0';
-		string decode_text;
-		if (text_file.is_open() && decode_file.is_open())
+		ifstream text_file(text_filename, ios::binary);
+		int lenght_file = 0;
+		if (text_file.is_open())
 		{
-			cout << "Files is open. Start Decoding\n";
-			while (!text_file.eof())
-			{
-				text_file.read(text, this->size_key);
-				if (text_file.eof())
-					break;
-				decode_text = Decode(text);
-				decode_file << decode_text;
-			} 
+			text_file.seekg(0, text_file.end);
+			lenght_file = text_file.tellg();
+			text_file.seekg(0, text_file.beg);
 			text_file.close();
+		}
+
+		ifstream encode_file(encode_filename, ios::binary);
+		ofstream decode_file(decode_filename, ios::binary);
+		char* encode_text = new char[size_key];
+		encode_text[size_key] = '\0';
+		char* decode_text = new char[size_key];
+		decode_text[size_key] = '\0';
+		if (encode_file.is_open() && decode_file.is_open())
+		{
+			cout << "Files is open. Start Decoding " << encode_filename << "\n";
+			while (!encode_file.eof())
+			{
+				encode_file.read(encode_text, this->size_key);
+				if (encode_file.eof() && encode_file.gcount() == 0)
+					break;
+				Decode(encode_text, decode_text);
+				int length_encode = encode_file.tellg();
+				if (length_encode > lenght_file)
+				{
+					decode_text[lenght_file % size_key] = '\0';
+					decode_file.write(decode_text, lenght_file % size_key);
+					break;
+				}
+				decode_file.write(decode_text, this->size_key);
+			} 
+			encode_file.close();
 			decode_file.close();
+			cout << "Success! Decode file: " << decode_filename << "\n";
 		}
 		else
 		{
@@ -188,13 +187,13 @@ public:
 
 int main()
 {
-	string text = "Hola, my name is Alex";
 	Encoder enc = Encoder();
-	/*string enc_text = enc.Encode(text);
-	string dec_text = enc.Decode(enc_text);*/
+	enc.FileEncode("text.txt", "enc_text.txt");
+	enc.FileDecode("text.txt", "enc_text.txt", "dec_text.txt");
 
-
-	enc.FileEncode("text.txt", "encode_text.txt");
-	enc.FileDecode("encode_text.txt", "decode_text.txt");
-	FilesCompare("text.txt", "decode_text.txt");
+	enc.FileEncode("img.jpg", "enc_img.jpg");
+	enc.FileDecode("img.jpg", "enc_img.jpg", "dec_img.jpg");
+	
+	/*enc.FileEncode("video.mp4", "enc_vid.mp4");
+	enc.FileDecode("video.mp4", "enc_vid.mp4", "dec_vid.mp4");*/
 }
