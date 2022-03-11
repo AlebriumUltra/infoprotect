@@ -1,4 +1,5 @@
-﻿#include <iostream>
+﻿#define _CRT_SECURE_NO_WARNINGS
+#include <iostream>
 #include <fstream>
 #include <string>
 using namespace std;
@@ -63,11 +64,13 @@ class Encoder {
 private:
 	int* key;
 	int size_key;
+	int size_block;
 public:
 	Encoder()
 	{
-		this->size_key = 10;
-		this->key = new int[this->size_key] {3, 6, 5, 2, 4, 1, 7, 9, 8, 10};
+		this->size_key = 32;
+		this->key = new int[this->size_key]{ 2, 22, 14, 1, 29, 0, 28, 23, 21, 15, 11, 17, 24, 19, 5, 25, 3, 30, 26, 6, 31, 16, 4, 13, 12, 18, 9, 8, 27, 20, 10, 7 };
+		this->size_block = 4;
 	}
 	Encoder(int* key, int size_key)
 	{
@@ -75,26 +78,80 @@ public:
 		this->key = new int[this->size_key];
 		CopyArray(key, this->key, size_key);
 	}
-	
+
 	void Encode(char* source_text, char* encode_text, int size_source)
 	{
-		if (size_source % this->size_key != 0)
+		if (size_source % this->size_block!= 0)
 		{
-			memset(&source_text[size_source], ' ', this->size_key - size_source);
-			source_text[this->size_key] = '\0';
+			memset(&source_text[size_source], '0', this->size_block - size_source);
+			source_text[this->size_block] = '\0';
 		}
 
-		for (size_t i = 0; i < this->size_key; i++)
+		char* bits = new char[size_key + 1];
+		bits[0] = '\0';
+		for (int i = 0; i < size_block; i++)
 		{
-			encode_text[i] = source_text[this->key[i] - 1];
+			for (int j = 0; j < 8; j++)
+			{
+				if ((source_text[i] << j) & 128)
+				{
+					strcat(bits, "1");
+				}
+				else
+				{
+					strcat(bits, "0");
+				}
+			}
+		}
+
+		char* enc_bits = new char[size_key + 1];
+		enc_bits[size_key] = '\0';
+		for (int i = 0; i < size_key; i++)
+		{
+			enc_bits[i] = bits[this->key[i]];
+		}
+
+		char byte[8];
+		for (int i = 0; i < size_block; i++)
+		{
+			strncpy(byte, enc_bits, 8);
+			encode_text[i] = strtol(byte, 0, 2);
+			enc_bits += 8;
 		}
 	}
 
 	void Decode(char* source_text, char* decode_text)
 	{
-		for (size_t i = 0; i < this->size_key; i++)
+		char* bits = new char[size_key + 1];
+		bits[0] = '\0';
+		for (int i = 0; i < size_block; i++)
 		{
-			decode_text[this->key[i] - 1] = source_text[i];
+			for (int j = 0; j < 8; j++)
+			{
+				if ((source_text[i] << j) & 128)
+				{
+					strcat(bits, "1");
+				}
+				else
+				{
+					strcat(bits, "0");
+				}
+			}
+		}
+
+		char* dec_bits = new char[size_key + 1];
+		dec_bits[size_key] = '\0';
+		for (int i = 0; i < size_key; i++)
+		{
+			dec_bits[this->key[i]] = bits[i];
+		}
+
+		char byte[8];
+		for (int i = 0; i < size_block; i++)
+		{
+			strncpy(byte, dec_bits, 8);
+			decode_text[i] = strtol(byte, 0, 2);
+			dec_bits += 8;
 		}
 	}
 
@@ -103,13 +160,13 @@ public:
 	{
 		ifstream text_file(text_filename, ios::binary);
 		ofstream encode_file(encode_filename, ios::binary);
-		char* text = new char[size_key + 1];
-		char* encode_text = new char[size_key + 1];
+		char* text = new char[size_block + 1];
+		char* encode_text = new char[size_block + 1];
 
 
 
-		text[size_key] = '\0';
-		encode_text[size_key] = '\0';
+		text[size_block] = '\0';
+		encode_text[size_block] = '\0';
 		int count_ch;
 
 		if (text_file.is_open() && encode_file.is_open())
@@ -121,11 +178,11 @@ public:
 			encode_file.write((char*)&count_ch, sizeof(int));
 			while (!text_file.eof())
 			{
-				text_file.read(text, this->size_key);
+				text_file.read(text, size_block);
 				if (text_file.eof() && text_file.gcount() == 0)
 					break;
 				Encode(text, encode_text, text_file.gcount());
-				encode_file.write(encode_text, this->size_key);
+				encode_file.write(encode_text, size_block);
 			}
 			text_file.close();
 			encode_file.close();
@@ -143,10 +200,10 @@ public:
 	{
 		ifstream encode_file(encode_filename, ios::binary);
 		ofstream decode_file(decode_filename, ios::binary);
-		char* encode_text = new char[size_key + 1];
-		encode_text[size_key] = '\0';
-		char* decode_text = new char[size_key + 1];
-		decode_text[size_key] = '\0';
+		char* encode_text = new char[size_block + 1];
+		encode_text[size_block] = '\0';
+		char* decode_text = new char[size_block + 1];
+		decode_text[size_block] = '\0';
 		int length_file = 0;
 		if (encode_file.is_open() && decode_file.is_open())
 		{
@@ -154,18 +211,19 @@ public:
 			encode_file.read((char*)&length_file, sizeof(int));
 			while (!encode_file.eof())
 			{
-				encode_file.read(encode_text, this->size_key);
+				encode_file.read(encode_text, size_block);
 				if (encode_file.eof() && encode_file.gcount() == 0)
 					break;
 				Decode(encode_text, decode_text);
 				int length_encode = encode_file.tellg();
+				length_encode -= 4;
 				if (length_encode > length_file)
 				{
-					decode_text[length_file % size_key] = '\0';
-					decode_file.write(decode_text, length_file % size_key);
+					decode_text[length_file % size_block] = '\0';
+					decode_file.write(decode_text, length_file % size_block);
 					break;
 				}
-				decode_file.write(decode_text, this->size_key);
+				decode_file.write(decode_text, size_block);
 			} 
 			encode_file.close();
 			decode_file.close();
@@ -192,5 +250,5 @@ int main()
 	enc.FileDecode("enc_img.jpg", "dec_img.jpg");
 	
 	/*enc.FileEncode("video.mp4", "enc_vid.mp4");
-	enc.FileDecode("video.mp4", "enc_vid.mp4", "dec_vid.mp4");*/
+	enc.FileDecode("enc_vid.mp4", "dec_vid.mp4");*/
 }
