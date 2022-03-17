@@ -76,83 +76,42 @@ public:
 	{
 		this->size_key = size_key;
 		this->key = new int[this->size_key];
+		this->size_block = 4;
 		CopyArray(key, this->key, size_key);
 	}
 
-	void Encode(char* source_text, char* encode_text, int size_source)
+	void Encode(void* source_text, void* encode_text, int size_source)
 	{
-		if (size_source % this->size_block!= 0)
+
+		if (size_source % this->size_block != 0)
 		{
-			memset(&source_text[size_source], '0', this->size_block - size_source);
-			source_text[this->size_block] = '\0';
+			memset((char*)source_text + size_source, '0', this->size_block - size_source);
 		}
 
-		char* bits = new char[size_key + 1];
-		bits[0] = '\0';
-		for (int i = 0; i < size_block; i++)
+		int text_num = *(int*)source_text;
+		int enc_num = 0;
+
+		for (int i = 0; i < this->size_key; i++)
 		{
-			for (int j = 0; j < 8; j++)
-			{
-				if ((source_text[i] << j) & 128)
-				{
-					strcat(bits, "1");
-				}
-				else
-				{
-					strcat(bits, "0");
-				}
-			}
+			enc_num |= ((text_num >> this->key[i]) & 1) << i;
 		}
 
-		char* enc_bits = new char[size_key + 1];
-		enc_bits[size_key] = '\0';
-		for (int i = 0; i < size_key; i++)
-		{
-			enc_bits[i] = bits[this->key[i]];
-		}
-
-		char byte[8];
-		for (int i = 0; i < size_block; i++)
-		{
-			strncpy(byte, enc_bits, 8);
-			encode_text[i] = strtol(byte, 0, 2);
-			enc_bits += 8;
-		}
+		/**((int*)encode_text) = enc_num;*/             // <-- два рабочих варианта по пустому указателю внести зашифрованное число
+		memcpy(encode_text, &enc_num, sizeof(int));
 	}
 
-	void Decode(char* source_text, char* decode_text)
+	void Decode(void* source_text, void* decode_text)
 	{
-		char* bits = new char[size_key + 1];
-		bits[0] = '\0';
-		for (int i = 0; i < size_block; i++)
+		int text_num = *(int*)source_text;
+		int dec_num = 0;
+
+		for (int i = 0; i < this->size_key; i++)
 		{
-			for (int j = 0; j < 8; j++)
-			{
-				if ((source_text[i] << j) & 128)
-				{
-					strcat(bits, "1");
-				}
-				else
-				{
-					strcat(bits, "0");
-				}
-			}
+			dec_num |= ((text_num >> i) & 1) << this->key[i];
 		}
 
-		char* dec_bits = new char[size_key + 1];
-		dec_bits[size_key] = '\0';
-		for (int i = 0; i < size_key; i++)
-		{
-			dec_bits[this->key[i]] = bits[i];
-		}
-
-		char byte[8];
-		for (int i = 0; i < size_block; i++)
-		{
-			strncpy(byte, dec_bits, 8);
-			decode_text[i] = strtol(byte, 0, 2);
-			dec_bits += 8;
-		}
+		/**((int*)decode_text) = dec_num;*/          // <-- и тут))
+		memcpy(decode_text, &dec_num, sizeof(int));
 	}
 
 	
@@ -160,13 +119,8 @@ public:
 	{
 		ifstream text_file(text_filename, ios::binary);
 		ofstream encode_file(encode_filename, ios::binary);
-		char* text = new char[size_block + 1];
-		char* encode_text = new char[size_block + 1];
-
-
-
-		text[size_block] = '\0';
-		encode_text[size_block] = '\0';
+		void* text = malloc(size_block);
+		void* encode_text = malloc(size_block);
 		int count_ch;
 
 		if (text_file.is_open() && encode_file.is_open())
@@ -178,11 +132,11 @@ public:
 			encode_file.write((char*)&count_ch, sizeof(int));
 			while (!text_file.eof())
 			{
-				text_file.read(text, size_block);
+				text_file.read((char*)text, size_block);
 				if (text_file.eof() && text_file.gcount() == 0)
 					break;
 				Encode(text, encode_text, text_file.gcount());
-				encode_file.write(encode_text, size_block);
+				encode_file.write((char*)encode_text, size_block);
 			}
 			text_file.close();
 			encode_file.close();
@@ -191,7 +145,7 @@ public:
 		}
 		else
 		{
-			cout << "Files opened error!\n";
+			cout << "Files opened error! " << text_filename << "\n";
 			return 1;
 		}
 	}
@@ -200,10 +154,8 @@ public:
 	{
 		ifstream encode_file(encode_filename, ios::binary);
 		ofstream decode_file(decode_filename, ios::binary);
-		char* encode_text = new char[size_block + 1];
-		encode_text[size_block] = '\0';
-		char* decode_text = new char[size_block + 1];
-		decode_text[size_block] = '\0';
+		void* encode_text = malloc(size_block);
+		void* decode_text = malloc(size_block);
 		int length_file = 0;
 		if (encode_file.is_open() && decode_file.is_open())
 		{
@@ -211,7 +163,7 @@ public:
 			encode_file.read((char*)&length_file, sizeof(int));
 			while (!encode_file.eof())
 			{
-				encode_file.read(encode_text, size_block);
+				encode_file.read((char*)encode_text, size_block);
 				if (encode_file.eof() && encode_file.gcount() == 0)
 					break;
 				Decode(encode_text, decode_text);
@@ -219,11 +171,10 @@ public:
 				length_encode -= 4;
 				if (length_encode > length_file)
 				{
-					decode_text[length_file % size_block] = '\0';
-					decode_file.write(decode_text, length_file % size_block);
+					decode_file.write((char*)decode_text, length_file % size_block);
 					break;
 				}
-				decode_file.write(decode_text, size_block);
+				decode_file.write((char*)decode_text, size_block);
 			} 
 			encode_file.close();
 			decode_file.close();
@@ -232,7 +183,7 @@ public:
 		}
 		else
 		{
-			cout << "Files opened error!\n";
+			cout << "Files opened error! " << encode_filename << "\n";
 			return 1;
 		}
 	}
