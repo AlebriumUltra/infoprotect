@@ -1,196 +1,129 @@
 ﻿#include <iostream>
-#include <fstream>
-#include <string>
-using namespace std;
+#include <time.h>
+#include <vector>
+#include <algorithm>
 
-void CopyArray(int* source, int* dest, int size)
+
+
+class MidSquareRandom
 {
-	for (size_t i = 0; i < size; i++)
-	{
-		dest[i] = source[i];
-	}
-}
-
-void FilesCompare(string text_filename, string decode_filename)
-{
-	ifstream text_file(text_filename, ios::binary);
-	ifstream decode_file(decode_filename, ios::binary);
-
-	if (text_file.is_open() && decode_file.is_open())
-	{
-		int size_text;
-		int size_decode;
-
-		text_file.seekg(0, text_file.end);
-		decode_file.seekg(0, decode_file.end);
-
-		size_text = text_file.tellg();
-		size_decode = decode_file.tellg();
-
-		text_file.seekg(0, text_file.beg);
-		decode_file.seekg(0, decode_file.beg);
-
-		bool result = true;
-		if (size_text != size_decode)
-		{
-			result = false;
-		}
-		else
-		{
-			char ch1, ch2;
-			do
-			{
-				decode_file.get(ch2);
-				text_file.get(ch1);
-				if (ch1 != ch2)
-				{
-					result = false;
-					break;
-				}
-			} while (!text_file.eof() && !decode_file.eof());
-		}
-		if (result)
-			cout << "Equal" << endl;
-		else
-			cout << "Unequal" << endl;
-	}
-	else
-		cout << "Error opening file!" << endl;
-
-}
-
-class Encoder {
 private:
-	int* key;
-	int size_key;
+	time_t seed;
 public:
-	Encoder()
+	MidSquareRandom()
 	{
-		this->size_key = 10;
-		this->key = new int[this->size_key] {3, 6, 5, 2, 4, 1, 7, 9, 8, 10};
+		this->seed = time(NULL);
 	}
-	Encoder(int* key, int size_key)
+	MidSquareRandom(time_t seed)
 	{
-		this->size_key = size_key;
-		this->key = new int[this->size_key];
-		CopyArray(key, this->key, size_key);
-	}
-	
-	void Encode(char* source_text, char* encode_text, int size_source)
-	{
-		if (size_source % this->size_key != 0)
-		{
-			memset(&source_text[size_source], ' ', this->size_key - size_source);
-			source_text[this->size_key] = '\0';
-		}
-
-		for (size_t i = 0; i < this->size_key; i++)
-		{
-			encode_text[i] = source_text[this->key[i] - 1];
-		}
+		this->seed = seed;
 	}
 
-	void Decode(char* source_text, char* decode_text)
+	uint8_t Rand()
 	{
-		for (size_t i = 0; i < this->size_key; i++)
-		{
-			decode_text[this->key[i] - 1] = source_text[i];
-		}
+        uint8_t num = (uint8_t)this->seed;
+        uint16_t sqr;
+        uint8_t res;
+
+        sqr = num * num;
+        res = (sqr >> 4) & 0xFF;
+		this->seed = (time_t)res;
+		return res;
 	}
 
-	
-	bool FileEncode(string text_filename, string encode_filename)
-	{
-		ifstream text_file(text_filename, ios::binary);
-		ofstream encode_file(encode_filename, ios::binary);
-		char* text = new char[size_key + 1];
-		char* encode_text = new char[size_key + 1];
-
-
-
-		text[size_key] = '\0';
-		encode_text[size_key] = '\0';
-		int count_ch;
-
-		if (text_file.is_open() && encode_file.is_open())
-		{
-			cout << "Files is open. Start Encoding: " << text_filename << "\n";
-			text_file.seekg(0, text_file.end);
-			count_ch = text_file.tellg();
-			text_file.seekg(0, text_file.beg);
-			encode_file.write((char*)&count_ch, sizeof(int));
-			while (!text_file.eof())
-			{
-				text_file.read(text, this->size_key);
-				if (text_file.eof() && text_file.gcount() == 0)
-					break;
-				Encode(text, encode_text, text_file.gcount());
-				encode_file.write(encode_text, this->size_key);
-			}
-			text_file.close();
-			encode_file.close();
-			cout << "Success! Encode file: " << encode_filename << "\n";
-			return 0;
-		}
-		else
-		{
-			cout << "Files opened error!\n";
-			return 1;
-		}
-	}
-
-	bool FileDecode(string encode_filename, string decode_filename)
-	{
-		ifstream encode_file(encode_filename, ios::binary);
-		ofstream decode_file(decode_filename, ios::binary);
-		char* encode_text = new char[size_key + 1];
-		encode_text[size_key] = '\0';
-		char* decode_text = new char[size_key + 1];
-		decode_text[size_key] = '\0';
-		int length_file = 0;
-		if (encode_file.is_open() && decode_file.is_open())
-		{
-			cout << "Files is open. Start Decoding " << encode_filename << "\n";
-			encode_file.read((char*)&length_file, sizeof(int));
-			while (!encode_file.eof())
-			{
-				encode_file.read(encode_text, this->size_key);
-				if (encode_file.eof() && encode_file.gcount() == 0)
-					break;
-				Decode(encode_text, decode_text);
-				int length_encode = encode_file.tellg();
-				if (length_encode > length_file)
-				{
-					decode_text[length_file % size_key] = '\0';
-					decode_file.write(decode_text, length_file % size_key);
-					break;
-				}
-				decode_file.write(decode_text, this->size_key);
-			} 
-			encode_file.close();
-			decode_file.close();
-			cout << "Success! Decode file: " << decode_filename << "\n";
-			return 0;
-		}
-		else
-		{
-			cout << "Files opened error!\n";
-			return 1;
-		}
-	}
+    void ChangeSeed(time_t seed)
+    {
+        this->seed = seed;
+    }
 };
 
 
 
 int main()
 {
-	Encoder enc = Encoder();
-	enc.FileEncode("text.txt", "enc_text.txt");
-	enc.FileDecode("enc_text.txt", "dec_text.txt");
+	MidSquareRandom rand = MidSquareRandom(1000);
+    int count_random[10] = { 0 };
+    int num;
+    num = rand.Rand();
+    std::vector<int> v;
 
-	enc.FileEncode("img.jpg", "enc_img.jpg");
-	enc.FileDecode("enc_img.jpg", "dec_img.jpg");
-	
-	/*enc.FileEncode("video.mp4", "enc_vid.mp4");
-	enc.FileDecode("video.mp4", "enc_vid.mp4", "dec_vid.mp4");*/
+
+    for (int i = 1001; i < 10000; i++)
+    {
+        while (1)
+        {
+            if (num == 0)
+            {
+                count_random[0]++;
+                break;
+            }
+
+            if (std::find(v.begin(), v.end(), num) != v.end())
+            {
+                break;
+            }
+
+            v.push_back(num);
+            
+            if (num < 25)
+            {
+                count_random[0]++;
+            }
+            if (num > 25 && num < 50)
+            {
+                count_random[1]++;
+
+            }
+            if (num > 50 && num < 75)
+            {
+                count_random[2]++;
+
+            }
+            if (num > 75 && num < 100)
+            {
+                count_random[3]++;
+
+            }
+            if (num > 100 && num < 125)
+            {
+                count_random[4]++;
+
+            }
+            if (num > 125 && num < 150)
+            {
+                count_random[5]++;
+
+            }
+            if (num > 150 && num < 175)
+            {
+                count_random[6]++;
+
+            }
+            if (num > 175 && num < 200)
+            {
+                count_random[7]++;
+
+            }
+            if (num > 200 && num < 225)
+            {
+                count_random[8]++;
+            }
+            if (num > 225 && num < 256)
+            {
+                count_random[9]++;
+            }
+
+            num = rand.Rand();
+        }
+        
+        rand.ChangeSeed(i);
+        num = rand.Rand();
+        v.clear();
+    }
+
+
+	for (int i = 0; i < 10; i++)
+	{
+        std::cout << count_random[i] << " ";
+	}
 }
