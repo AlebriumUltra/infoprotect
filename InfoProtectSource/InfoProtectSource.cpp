@@ -2,7 +2,7 @@
 #include <time.h>
 #include <vector>
 #include <algorithm>
-
+#include <Windows.h>
 
 
 class MidSquareRandom
@@ -41,13 +41,23 @@ public:
 
 int main()
 {
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
+
 	MidSquareRandom rand = MidSquareRandom(1000);
     int count_random[10] = { 0 };
-    int num;
-    num = rand.Rand();
+    int num = 1;
     std::vector<int> v;
 
+    while (num != 0)
+    {
+        num = rand.Rand();
+        printf("%d\n", num);
+    }
 
+    printf("\n");
+
+    printf("Распределение чисел: ");
     for (int i = 1001; i < 10000; i++)
     {
         while (1)
@@ -126,4 +136,5 @@ int main()
 	{
         std::cout << count_random[i] << " ";
 	}
+    printf("\n");
 }
