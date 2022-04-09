@@ -1,196 +1,113 @@
-﻿#include <iostream>
-#include <fstream>
-#include <string>
-using namespace std;
-
-void CopyArray(int* source, int* dest, int size)
-{
-	for (size_t i = 0; i < size; i++)
-	{
-		dest[i] = source[i];
-	}
-}
-
-void FilesCompare(string text_filename, string decode_filename)
-{
-	ifstream text_file(text_filename, ios::binary);
-	ifstream decode_file(decode_filename, ios::binary);
-
-	if (text_file.is_open() && decode_file.is_open())
-	{
-		int size_text;
-		int size_decode;
-
-		text_file.seekg(0, text_file.end);
-		decode_file.seekg(0, decode_file.end);
-
-		size_text = text_file.tellg();
-		size_decode = decode_file.tellg();
-
-		text_file.seekg(0, text_file.beg);
-		decode_file.seekg(0, decode_file.beg);
-
-		bool result = true;
-		if (size_text != size_decode)
-		{
-			result = false;
-		}
-		else
-		{
-			char ch1, ch2;
-			do
-			{
-				decode_file.get(ch2);
-				text_file.get(ch1);
-				if (ch1 != ch2)
-				{
-					result = false;
-					break;
-				}
-			} while (!text_file.eof() && !decode_file.eof());
-		}
-		if (result)
-			cout << "Equal" << endl;
-		else
-			cout << "Unequal" << endl;
-	}
-	else
-		cout << "Error opening file!" << endl;
-
-}
-
-class Encoder {
-private:
-	int* key;
-	int size_key;
-public:
-	Encoder()
-	{
-		this->size_key = 10;
-		this->key = new int[this->size_key] {3, 6, 5, 2, 4, 1, 7, 9, 8, 10};
-	}
-	Encoder(int* key, int size_key)
-	{
-		this->size_key = size_key;
-		this->key = new int[this->size_key];
-		CopyArray(key, this->key, size_key);
-	}
-	
-	void Encode(char* source_text, char* encode_text, int size_source)
-	{
-		if (size_source % this->size_key != 0)
-		{
-			memset(&source_text[size_source], ' ', this->size_key - size_source);
-			source_text[this->size_key] = '\0';
-		}
-
-		for (size_t i = 0; i < this->size_key; i++)
-		{
-			encode_text[i] = source_text[this->key[i] - 1];
-		}
-	}
-
-	void Decode(char* source_text, char* decode_text)
-	{
-		for (size_t i = 0; i < this->size_key; i++)
-		{
-			decode_text[this->key[i] - 1] = source_text[i];
-		}
-	}
-
-	
-	bool FileEncode(string text_filename, string encode_filename)
-	{
-		ifstream text_file(text_filename, ios::binary);
-		ofstream encode_file(encode_filename, ios::binary);
-		char* text = new char[size_key + 1];
-		char* encode_text = new char[size_key + 1];
-
-
-
-		text[size_key] = '\0';
-		encode_text[size_key] = '\0';
-		int count_ch;
-
-		if (text_file.is_open() && encode_file.is_open())
-		{
-			cout << "Files is open. Start Encoding: " << text_filename << "\n";
-			text_file.seekg(0, text_file.end);
-			count_ch = text_file.tellg();
-			text_file.seekg(0, text_file.beg);
-			encode_file.write((char*)&count_ch, sizeof(int));
-			while (!text_file.eof())
-			{
-				text_file.read(text, this->size_key);
-				if (text_file.eof() && text_file.gcount() == 0)
-					break;
-				Encode(text, encode_text, text_file.gcount());
-				encode_file.write(encode_text, this->size_key);
-			}
-			text_file.close();
-			encode_file.close();
-			cout << "Success! Encode file: " << encode_filename << "\n";
-			return 0;
-		}
-		else
-		{
-			cout << "Files opened error!\n";
-			return 1;
-		}
-	}
-
-	bool FileDecode(string encode_filename, string decode_filename)
-	{
-		ifstream encode_file(encode_filename, ios::binary);
-		ofstream decode_file(decode_filename, ios::binary);
-		char* encode_text = new char[size_key + 1];
-		encode_text[size_key] = '\0';
-		char* decode_text = new char[size_key + 1];
-		decode_text[size_key] = '\0';
-		int length_file = 0;
-		if (encode_file.is_open() && decode_file.is_open())
-		{
-			cout << "Files is open. Start Decoding " << encode_filename << "\n";
-			encode_file.read((char*)&length_file, sizeof(int));
-			while (!encode_file.eof())
-			{
-				encode_file.read(encode_text, this->size_key);
-				if (encode_file.eof() && encode_file.gcount() == 0)
-					break;
-				Decode(encode_text, decode_text);
-				int length_encode = encode_file.tellg();
-				if (length_encode > length_file)
-				{
-					decode_text[length_file % size_key] = '\0';
-					decode_file.write(decode_text, length_file % size_key);
-					break;
-				}
-				decode_file.write(decode_text, this->size_key);
-			} 
-			encode_file.close();
-			decode_file.close();
-			cout << "Success! Decode file: " << decode_filename << "\n";
-			return 0;
-		}
-		else
-		{
-			cout << "Files opened error!\n";
-			return 1;
-		}
-	}
-};
-
-
+﻿#include <Windows.h>
+#include <stdio.h>
+#include <AccCtrl.h>
+#include <aclapi.h>
+#include <winnt.h>
 
 int main()
 {
-	Encoder enc = Encoder();
-	enc.FileEncode("text.txt", "enc_text.txt");
-	enc.FileDecode("enc_text.txt", "dec_text.txt");
+	HANDLE hToken;
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
+	{
+		printf("OpenProcessToken Error %d", GetLastError());
+		return 1;
+	}
 
-	enc.FileEncode("img.jpg", "enc_img.jpg");
-	enc.FileDecode("enc_img.jpg", "dec_img.jpg");
+
+	DWORD dwSize = 0;
+	BOOL bResult = GetTokenInformation(hToken, TokenUser, NULL, dwSize, &dwSize);
+	if (!bResult)
+	{
+		if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+		{
+			printf("Error size GetTokenInformation! %d", GetLastError());
+			return 1;
+		}
+	}
+
+	PTOKEN_USER tu = (PTOKEN_USER)LocalAlloc(LPTR, dwSize);
+	// Получаем маркер пользователя
+	bResult = GetTokenInformation(hToken, TokenUser, tu, dwSize, &dwSize);
+	if (!bResult)
+	{
+		printf("Error Token User GetTokenInformation! %d", GetLastError());
+		return 1;
+	}
+	// Вытаскиваем sid из маркера пользователя
+	PSID pSidCurrentUser = tu->User.Sid;
+	SID_IDENTIFIER_AUTHORITY pSIDAuthWorldGroup = SECURITY_WORLD_SID_AUTHORITY;
+	PSID pSIDWorldGroup;
+	bResult = AllocateAndInitializeSid(&pSIDAuthWorldGroup, 1, SECURITY_WORLD_RID, 0, 0, 0, 0, 0, 0, 0, &pSIDWorldGroup);
+	if (!bResult)
+	{
+		printf("Error WorldGroup AllocateAndInitializeSid! %d", GetLastError());
+		return 1;
+	}
 	
-	/*enc.FileEncode("video.mp4", "enc_vid.mp4");
-	enc.FileDecode("video.mp4", "enc_vid.mp4", "dec_vid.mp4");*/
+
+
+
+	EXPLICIT_ACCESS	eaAccessList[2];
+	ZeroMemory(&eaAccessList, 2 * sizeof(EXPLICIT_ACCESS));
+	
+	//fill Current User ACE
+	eaAccessList[0].grfAccessPermissions = GENERIC_ALL;
+	eaAccessList[0].grfAccessMode = SET_ACCESS;
+	eaAccessList[0].grfInheritance = NO_INHERITANCE;
+	eaAccessList[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+	eaAccessList[0].Trustee.TrusteeType = TRUSTEE_IS_USER;
+	eaAccessList[0].Trustee.ptstrName = (LPTSTR)pSidCurrentUser;
+
+	//fill World Group ACE
+	eaAccessList[1].grfAccessPermissions = GENERIC_WRITE;
+	eaAccessList[1].grfAccessMode = DENY_ACCESS;
+	eaAccessList[1].grfInheritance = NO_INHERITANCE;
+	eaAccessList[1].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+	eaAccessList[1].Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+	eaAccessList[1].Trustee.ptstrName = (LPTSTR)pSIDWorldGroup;
+
+
+
+	PACL pAcl = NULL;
+	DWORD dwResult = SetEntriesInAcl(2, eaAccessList, NULL, &pAcl);
+	if (dwResult != ERROR_SUCCESS)
+	{
+		printf("Error SetEntriesInAcl! %d", GetLastError());
+		return 1;
+	}
+
+	PSECURITY_DESCRIPTOR pSD;
+	pSD = (PSECURITY_DESCRIPTOR)LocalAlloc(LPTR, SECURITY_DESCRIPTOR_MIN_LENGTH);
+	if (pSD == NULL)
+	{
+		printf("Error LocalAlloc! %d", GetLastError());
+		return 1;
+	}
+
+	bResult = InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION);
+	if (!bResult)
+	{
+		printf("Error InitializeSecurityDescriptor! %d", GetLastError());
+		return 1;
+	}
+
+	bResult = SetSecurityDescriptorDacl(pSD, TRUE, pAcl, FALSE);	
+	if (!bResult)
+	{
+		printf("Error SetSecurityDescriptorDacl! %d", GetLastError());
+		return 1;
+	}
+
+	SECURITY_ATTRIBUTES sa;
+	sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+	sa.lpSecurityDescriptor = pSD;
+	sa.bInheritHandle = FALSE;
+
+	CreateFile(L"testfile.txt", NULL, 0, &sa, CREATE_ALWAYS, 0, NULL);
+
+	FreeSid(pSIDWorldGroup);
+	LocalFree(pAcl);
+	LocalFree(pSD);
+	LocalFree(tu);
+	return 0;
 }

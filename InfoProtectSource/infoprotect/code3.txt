@@ -1,0 +1,103 @@
+#include <iostream>
+#include <time.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+
+using namespace std;
+
+
+int
+my_llstr(long long v, // source for 'printing'
+    int radix,
+    int unsign,  // if 1 then unsigned source
+    char* res)   // memory for result
+{
+    const char* dig = "0123456789abcdef";
+    static const char cb64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    int          rem[65], sp = 0;   // stack for reminders
+    char* p = res;           // for return length
+    unsigned long long   u = v;     // use if unsign == 1
+
+    if (!res)
+        return 0;
+    if (radix < 2)
+        radix = 2;
+    if (radix > 64)
+        radix = 64;
+    if (radix > 16)
+        dig = cb64;
+
+    if (unsign) {
+        while (u >= radix) {
+            rem[sp++] = u % radix;
+            u = u / radix;
+        }
+        //  *res++ = (radix > 16)? cb64[u]: dig[u];
+        *res++ = dig[u];
+    }
+    else {
+        if (v < 0) {
+            *res++ = '-';
+            if (v == (1LL << 63)) {
+                rem[sp++] = (unsigned long long)(1LL << 63) % radix;
+                v = -(v / radix);
+            }
+            else
+                v = -v;
+        }
+        while (v >= radix) {
+            rem[sp++] = v % radix;
+            v = v / radix;
+        }
+        //    *res++ =  (radix > 16)? cb64[v]: dig[v];
+        *res++ = dig[v];
+    }
+
+    while (sp)
+        //    *res++ =  (radix > 16)? cb64[rem[--sp]]: dig[rem[--sp]];
+        *res++ = dig[rem[--sp]];
+    *res = 0;
+    return res - p;
+}
+
+
+class MidSquareRandom
+{
+private:
+	time_t seed;
+public:
+	MidSquareRandom()
+	{
+		this->seed = time(NULL);
+	}
+	MidSquareRandom(time_t seed)
+	{
+		this->seed = seed;
+	}
+
+	unsigned int Rand()
+	{
+		unsigned short* num = new unsigned short[1];
+        unsigned char* res = new unsigned char[1];
+
+        *num = this->seed * this->seed;
+        *res = (*num >> 4) & 0xFF;
+		this->seed = *res;
+		return (unsigned int)*res;
+	}
+};
+
+
+
+int main()
+{
+	MidSquareRandom rand = MidSquareRandom(3999);
+
+	for (int i = 0; i < 100; i++)
+	{
+		cout << rand.Rand() << "\n";
+	}
+}
