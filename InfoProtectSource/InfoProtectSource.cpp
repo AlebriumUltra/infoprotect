@@ -3,51 +3,9 @@
 #include <windows.h>
 
 
-void CreateTestBMP(LPCWSTR szFileName, PRGBTRIPLE pColor)
-{
-	// Объявим нужные структуры
-	BITMAPFILEHEADER bfh;
-	memset(&bfh, 0, sizeof(bfh));
-	BITMAPINFOHEADER bih;
-	BYTE Palette[1024]; // Палитра
-	memset(Palette, 0, 1024);
-	// Пусть у нас будет картинка размером 35 x 50 пикселей
-	int Width = 500;
-	int Height = 500;
-	bfh.bfType = 0x4D42; // Обозначим, что это bmp 'BM'
-	bfh.bfOffBits = sizeof(bfh) + sizeof(bih); // Палитра занимает 1Kb, но мы его использовать не будем
-	bfh.bfSize = bfh.bfOffBits +
-		sizeof(*pColor) * Width * Height +
-		Height * ((sizeof(*pColor) * Width) % 4); // Посчитаем размер конечного файла
-	memset(&bih, 0, sizeof(bih));
-	bih.biSize = sizeof(bih);
-	bih.biBitCount = 24;
-	bih.biClrUsed = 0;
-	bih.biCompression = BI_RGB; // Без сжатия
-	bih.biHeight = Height;
-	bih.biWidth = Width;
-	bih.biPlanes = 1; // Должно быть 1
-	// Остальные поля остаются 0
-	HANDLE hFile = CreateFile(szFileName, GENERIC_WRITE, 0, NULL,
-		CREATE_ALWAYS, 0, NULL);
-	if (hFile == INVALID_HANDLE_VALUE)
-		return;
-	DWORD RW;
-	// Запишем заголовки
-	WriteFile(hFile, &bfh, sizeof(bfh), &RW, NULL);
-	WriteFile(hFile, &bih, sizeof(bih), &RW, NULL);
-	// Запишем растр
-	for (int i = 0; i < Height; ++i)
-	{
-		for (int j = 0; j < Width; ++j)
-		{
-			WriteFile(hFile, pColor, sizeof(*pColor), &RW, NULL);
-		}
-		// Обеспечим выравнивание строки
-		WriteFile(hFile, 0, (sizeof(*pColor) * Width) % 4, &RW, NULL);
-	}
-	CloseHandle(hFile);
-}
+
+DWORD Tag = 1837694739;
+
 
 void embed(LPCWSTR szTextFileName, LPCWSTR szBMPFileName)
 {
@@ -90,7 +48,7 @@ void embed(LPCWSTR szTextFileName, LPCWSTR szBMPFileName)
 	SetFilePointer(hBMPFile, 10, 0, FILE_BEGIN);
 	ReadFile(hBMPFile, &rastr_size, 4, &dBytesBMP, NULL);
 	SetFilePointer(hBMPFile, rastr_size, 0, FILE_BEGIN);
-	
+
 	dBytesBMP = 0;
 	rastr_size = 0;
 
@@ -98,11 +56,22 @@ void embed(LPCWSTR szTextFileName, LPCWSTR szBMPFileName)
 	ReadFile(hEncFile, &rastr_size, 4, &dBytesBMP, NULL);
 	SetFilePointer(hEncFile, rastr_size, 0, FILE_BEGIN);
 
-	DWORD TextSize = 0; 
+	DWORD TextSize = 0;
 	TextSize = GetFileSize(hTextFile, NULL);
 	DWORD dBytesText = 0;
 	BYTE buf = 0;
 	BYTE bufpix = 0;
+
+
+	for (int i = 0; i < sizeof(DWORD) * 8; i++)
+	{
+		bResult = ReadFile(hBMPFile, &bufpix, 1, &dBytesBMP, NULL);
+		bufpix &= 0xFE;
+		bufpix |= (Tag & 1) << 0;
+		Tag = Tag >> 1;
+		WriteFile(hEncFile, &bufpix, sizeof(bufpix), &dBytesBMP, NULL);
+	}
+
 
 	for (int i = 0; i < sizeof(DWORD) * 8; i++)
 	{
@@ -112,7 +81,7 @@ void embed(LPCWSTR szTextFileName, LPCWSTR szBMPFileName)
 		TextSize = TextSize >> 1;
 		WriteFile(hEncFile, &bufpix, sizeof(bufpix), &dBytesBMP, NULL);
 	}
-	
+
 	while (1)
 	{
 		bResult = ReadFile(hTextFile, &buf, 1, &dBytesText, NULL);
@@ -131,7 +100,7 @@ void embed(LPCWSTR szTextFileName, LPCWSTR szBMPFileName)
 			WriteFile(hEncFile, &bufpix, 1, &dBytesBMP, NULL);
 		}
 	}
-	
+
 	printf("Embed success!");
 	CloseHandle(hBMPFile);
 	CloseHandle(hTextFile);
@@ -157,10 +126,10 @@ void retrieve(LPCWSTR szBMPFileName, LPCWSTR szDecTextFileName)
 	DWORD dBytesBMP = 0;
 	DWORD rastr_size = 0;
 	BOOL bResult = 0;
-	
+
 	SetFilePointer(hBMPFile, 10, 0, FILE_BEGIN);
 	ReadFile(hBMPFile, &rastr_size, 4, &dBytesBMP, NULL);
-	SetFilePointer(hBMPFile, rastr_size, 0, FILE_BEGIN);
+	SetFilePointer(hBMPFile, rastr_size + sizeof(DWORD) * 8, 0, FILE_BEGIN);
 
 	DWORD dBytesText = 0;
 	BYTE byteText = 0;
@@ -202,14 +171,41 @@ void retrieve(LPCWSTR szBMPFileName, LPCWSTR szDecTextFileName)
 }
 
 
-bool check(LPCWSTR szBMPFilename) // TODO FUNC
+
+bool check(LPCWSTR szBMPFilename)
 {
 	HANDLE hBMPFile = CreateFile(szBMPFilename, GENERIC_READ, 0, 0, OPEN_EXISTING, 0, 0);
 	if (hBMPFile == INVALID_HANDLE_VALUE)
 	{
-		printf("error open BMP file!");
+		printf("error open BMP file! %d", GetLastError());
 		return 1;
 	}
+
+	DWORD dBytesBMP = 0;
+	DWORD rastr_size = 0;
+	BOOL bResult = 0;
+	DWORD dFileTag = 0;
+	BYTE EncPix = 0;
+
+	SetFilePointer(hBMPFile, 10, 0, FILE_BEGIN);
+	ReadFile(hBMPFile, &rastr_size, 4, &dBytesBMP, NULL);
+	SetFilePointer(hBMPFile, rastr_size, 0, FILE_BEGIN);
+
+	for (int i = 0; i < sizeof(DWORD) * 8; i++)
+	{
+		bResult = ReadFile(hBMPFile, &EncPix, 1, &dBytesBMP, NULL);
+		dFileTag |= (EncPix & 1) << i;
+	}
+
+	if (dFileTag == Tag)
+	{
+		printf("Maybe have stego!");
+	}
+	else
+	{
+		printf("Don't have stego!");
+	}
+
 
 	CloseHandle(hBMPFile);
 	return 0;
@@ -224,7 +220,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf("Error param count!");
 		return 1;
 	}
-	
+
 	if (wcscmp(argv[1], L"-embed") == 0)
 	{
 		embed(argv[2], argv[3]);
@@ -236,9 +232,12 @@ int _tmain(int argc, _TCHAR* argv[])
 		retrieve(argv[2], argv[3]);
 		return 0;
 	}
-	
-	if (wcscmp(argv[2], L"-check") == 0)
+
+	if (wcscmp(argv[1], L"-check") == 0)
 	{
+		check(argv[2]);
 		return 0;
 	}
+
 }
+
