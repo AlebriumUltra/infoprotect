@@ -9,7 +9,15 @@ DWORD Tag = 1837694739;
 
 void embed(LPCWSTR szTextFileName, LPCWSTR szBMPFileName)
 {
+	HANDLE hTextFile = CreateFile(szTextFileName, GENERIC_READ | GENERIC_WRITE | GENERIC_EXECUTE, 0, NULL, OPEN_EXISTING, 0, NULL);
+	if (hTextFile == INVALID_HANDLE_VALUE)
+	{
+		printf("Error open text file! %d", GetLastError());
+		return;
+	}
+
 	BOOL res = CopyFile(szBMPFileName, L"enc.bmp", 0);
+
 	if (res == 0)
 	{
 		printf("Error copy file! %d", GetLastError());
@@ -22,14 +30,6 @@ void embed(LPCWSTR szTextFileName, LPCWSTR szBMPFileName)
 		printf("Error open bmp file! %d", GetLastError());
 		return;
 	}
-
-	HANDLE hTextFile = CreateFile(szTextFileName, GENERIC_READ | GENERIC_WRITE | GENERIC_EXECUTE, 0, NULL, OPEN_EXISTING, 0, NULL);
-	if (hTextFile == INVALID_HANDLE_VALUE)
-	{
-		printf("Error open text file! %d", GetLastError());
-		return;
-	}
-
 
 	HANDLE hEncFile = CreateFile(L"enc.bmp", GENERIC_WRITE | GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
 	if (hEncFile == INVALID_HANDLE_VALUE)
